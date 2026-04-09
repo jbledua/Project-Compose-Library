@@ -1,0 +1,50 @@
+---
+services:
+  library-ts:
+    image: tailscale/tailscale:latest
+    container_name: ${STACK_NAME}-ts
+    hostname: ${TS_HOSTNAME}
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - "TS_EXTRA_ARGS=--advertise-tags=tag:container --reset"
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - library-ts-state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-13378}:80"
+
+  library-app:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: ${STACK_NAME}-app
+    network_mode: service:library-ts
+    depends_on:
+      - library-ts
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TIMEZONE:-UTC}
+    volumes:
+      - library-config:/config
+      - library-metadata:/metadata
+      - ${AUDIOBOOKS_PATH}:/audiobooks
+      - ${PODCASTS_PATH}:/podcasts
+    restart: unless-stopped
+
+volumes:
+  library-ts-state:
+    name: ${STACK_NAME}-state
+    driver: local
+
+  library-config:
+    name: ${STACK_NAME}-config
+    driver: local
+
+  library-metadata:
+    name: ${STACK_NAME}-metadata
+    driver: local
